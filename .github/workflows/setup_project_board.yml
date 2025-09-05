@@ -21,19 +21,33 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Create a new project (v2)
-            const createProjectQuery = `
-              mutation {
-                createProjectV2(input: {title: "Trading Algorithm Feature Board", ownerId: "${context.repo.owner}"}) {
-                  projectV2 {
-                    id
-                    number
-                  }
+            // Get the owner node ID
+            const ownerQuery = `
+              query {
+                user(login: "${context.repo.owner}") {
+                  id
                 }
               }
             `;
             
             try {
+              // Get the owner node ID
+              const ownerResponse = await github.graphql(ownerQuery);
+              const ownerId = ownerResponse.user.id;
+              console.log(`Owner ID: ${ownerId}`);
+              
+              // Create a new project (v2)
+              const createProjectQuery = `
+                mutation {
+                  createProjectV2(input: {title: "Trading Algorithm Feature Board", ownerId: "${ownerId}"}) {
+                    projectV2 {
+                      id
+                      number
+                    }
+                  }
+                }
+              `;
+              
               const projectResponse = await github.graphql(createProjectQuery);
               const projectId = projectResponse.createProjectV2.projectV2.id;
               const projectNumber = projectResponse.createProjectV2.projectV2.number;
