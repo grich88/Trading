@@ -10,6 +10,7 @@ jobs:
       contents: read
       issues: write
       repository-projects: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -20,82 +21,150 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Create project board
-            const project = await github.rest.projects.createForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              name: 'Trading Algorithm Feature Board',
-              body: 'Project board for tracking trading algorithm features'
-            });
+            // Create a new project (v2)
+            const createProjectQuery = `
+              mutation {
+                createProjectV2(input: {title: "Trading Algorithm Feature Board", ownerId: "${context.repo.owner}"}) {
+                  projectV2 {
+                    id
+                    number
+                  }
+                }
+              }
+            `;
             
-            console.log(`Created project board: ${project.data.html_url}`);
-            
-            // Create columns
-            const columns = [
-              'Loose Ideas',
-              'Backlog',
-              'ToDo',
-              'In Progress',
-              'In Review',
-              'Done'
-            ];
-            
-            const columnIds = {};
-            
-            for (const column of columns) {
-              const columnData = await github.rest.projects.createColumn({
-                project_id: project.data.id,
-                name: column
+            try {
+              const projectResponse = await github.graphql(createProjectQuery);
+              const projectId = projectResponse.createProjectV2.projectV2.id;
+              const projectNumber = projectResponse.createProjectV2.projectV2.number;
+              
+              console.log(`Created project: ${projectId} (Number: ${projectNumber})`);
+              
+              // Create a custom field for status
+              const createFieldQuery = `
+                mutation {
+                  createProjectV2Field(input: {projectId: "${projectId}", dataType: SINGLE_SELECT, name: "Status"}) {
+                    projectV2Field {
+                      id
+                      name
+                    }
+                  }
+                }
+              `;
+              
+              const fieldResponse = await github.graphql(createFieldQuery);
+              const fieldId = fieldResponse.createProjectV2Field.projectV2Field.id;
+              
+              console.log(`Created Status field: ${fieldId}`);
+              
+              // Create status options
+              const statuses = [
+                "Loose Ideas",
+                "Backlog",
+                "ToDo",
+                "In Progress",
+                "In Review",
+                "Done"
+              ];
+              
+              const optionIds = {};
+              
+              for (const status of statuses) {
+                const createOptionQuery = `
+                  mutation {
+                    createProjectV2FieldOption(input: {projectId: "${projectId}", fieldId: "${fieldId}", name: "${status}"}) {
+                      projectV2FieldOption {
+                        id
+                        name
+                      }
+                    }
+                  }
+                `;
+                
+                const optionResponse = await github.graphql(createOptionQuery);
+                const optionId = optionResponse.createProjectV2FieldOption.projectV2FieldOption.id;
+                optionIds[status] = optionId;
+                
+                console.log(`Created option ${status}: ${optionId}`);
+              }
+              
+              // Get all issues
+              const issues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100
               });
               
-              columnIds[column] = columnData.data.id;
-              console.log(`Created column: ${column} with ID ${columnData.data.id}`);
-            }
-            
-            // Get all issues
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              per_page: 100
-            });
-            
-            // Issue categories
-            const issueCategories = {
-              'Initialize Project Repository': 'Loose Ideas',
-              'Set Up Configuration Management': 'Backlog',
-              'Implement Logging and Error Handling': 'Backlog',
-              'Create Base Service Architecture': 'ToDo',
-              'Implement Historical Data Collection Service': 'ToDo',
-              'Implement Technical Indicators Calculation': 'ToDo',
-              'Implement Market Structure Analysis Model': 'In Progress',
-              'Implement Open Interest vs Price Divergence Analysis': 'In Progress',
-              'Implement Spot vs Perp CVD Analysis': 'Backlog',
-              'Implement Delta Volume Analysis': 'Backlog',
-              'Implement Liquidation Analysis': 'Backlog',
-              'Implement Funding Rate Analysis': 'Backlog',
-              'Implement Gamma Exposure Analysis': 'Loose Ideas',
-              'Implement Macro Events Analysis': 'Loose Ideas',
-              'Implement Cross-Asset Correlation Analysis': 'In Review',
-              'Implement On-Chain Analysis': 'Loose Ideas',
-              'Implement Signal Integration Service': 'ToDo',
-              'Implement Trading Signal Generator': 'ToDo',
-              'Implement Signal Visualization': 'Done',
-              'Implement Notification Service': 'Done'
-            };
-            
-            // Add issues to columns
-            for (const issue of issues.data) {
-              const category = issueCategories[issue.title] || 'Backlog';
-              const columnId = columnIds[category];
+              // Issue categories
+              const issueCategories = {
+                'Initialize Project Repository': 'Loose Ideas',
+                'Set Up Configuration Management': 'Backlog',
+                'Implement Logging and Error Handling': 'Backlog',
+                'Create Base Service Architecture': 'ToDo',
+                'Implement Historical Data Collection Service': 'ToDo',
+                'Implement Technical Indicators Calculation': 'ToDo',
+                'Implement Market Structure Analysis Model': 'In Progress',
+                'Implement Open Interest vs Price Divergence Analysis': 'In Progress',
+                'Implement Spot vs Perp CVD Analysis': 'Backlog',
+                'Implement Delta Volume Analysis': 'Backlog',
+                'Implement Liquidation Analysis': 'Backlog',
+                'Implement Funding Rate Analysis': 'Backlog',
+                'Implement Gamma Exposure Analysis': 'Loose Ideas',
+                'Implement Macro Events Analysis': 'Loose Ideas',
+                'Implement Cross-Asset Correlation Analysis': 'In Review',
+                'Implement On-Chain Analysis': 'Loose Ideas',
+                'Implement Signal Integration Service': 'ToDo',
+                'Implement Trading Signal Generator': 'ToDo',
+                'Implement Signal Visualization': 'Done',
+                'Implement Notification Service': 'Done'
+              };
               
-              if (columnId) {
-                await github.rest.projects.createCard({
-                  column_id: columnId,
-                  content_id: issue.id,
-                  content_type: 'Issue'
-                });
+              // Add issues to project
+              for (const issue of issues.data) {
+                // Add issue to project
+                const addIssueQuery = `
+                  mutation {
+                    addProjectV2ItemById(input: {projectId: "${projectId}", contentId: "${issue.node_id}"}) {
+                      item {
+                        id
+                      }
+                    }
+                  }
+                `;
                 
-                console.log(`Added issue #${issue.number} (${issue.title}) to column ${category}`);
+                const addResponse = await github.graphql(addIssueQuery);
+                const itemId = addResponse.addProjectV2ItemById.item.id;
+                
+                // Set status
+                const category = issueCategories[issue.title] || 'Backlog';
+                const optionId = optionIds[category];
+                
+                if (optionId) {
+                  const setStatusQuery = `
+                    mutation {
+                      updateProjectV2ItemFieldValue(input: {
+                        projectId: "${projectId}", 
+                        itemId: "${itemId}", 
+                        fieldId: "${fieldId}", 
+                        value: {
+                          singleSelectOptionId: "${optionId}"
+                        }
+                      }) {
+                        projectV2Item {
+                          id
+                        }
+                      }
+                    }
+                  `;
+                  
+                  await github.graphql(setStatusQuery);
+                  console.log(`Added issue #${issue.number} (${issue.title}) to column ${category}`);
+                }
               }
+              
+              console.log(`Project board setup complete! View at https://github.com/users/${context.repo.owner}/projects/${projectNumber}`);
+            } catch (error) {
+              console.error('Error creating project:', error);
+              core.setFailed(`Error creating project: ${error.message}`);
             }
