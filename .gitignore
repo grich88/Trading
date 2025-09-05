@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Logs
+*.log
+logs/
+log/
+
+# Local development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+PR_DESCRIPTION_*.md
+TICKET_*_COMPLETION_SUMMARY.md
+*_env_vars.txt
+WORK_SUMMARY.md
+NOTES.md
+live_debug_*/
+
+# Data files
+*.csv
+*.json
+*.xlsx
+*.xls
+*.parquet
+*.feather
+
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.bmp
+
+# OS specific files
+.DS_Store
+Thumbs.db
