@@ -1,0 +1,101 @@
+name: Setup Project Board
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-project-board:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      repository-projects: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create Project Board
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Create project board
+            const project = await github.rest.projects.createForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Trading Algorithm Feature Board',
+              body: 'Project board for tracking trading algorithm features'
+            });
+            
+            console.log(`Created project board: ${project.data.html_url}`);
+            
+            // Create columns
+            const columns = [
+              'Loose Ideas',
+              'Backlog',
+              'ToDo',
+              'In Progress',
+              'In Review',
+              'Done'
+            ];
+            
+            const columnIds = {};
+            
+            for (const column of columns) {
+              const columnData = await github.rest.projects.createColumn({
+                project_id: project.data.id,
+                name: column
+              });
+              
+              columnIds[column] = columnData.data.id;
+              console.log(`Created column: ${column} with ID ${columnData.data.id}`);
+            }
+            
+            // Get all issues
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            
+            // Issue categories
+            const issueCategories = {
+              'Initialize Project Repository': 'Loose Ideas',
+              'Set Up Configuration Management': 'Backlog',
+              'Implement Logging and Error Handling': 'Backlog',
+              'Create Base Service Architecture': 'ToDo',
+              'Implement Historical Data Collection Service': 'ToDo',
+              'Implement Technical Indicators Calculation': 'ToDo',
+              'Implement Market Structure Analysis Model': 'In Progress',
+              'Implement Open Interest vs Price Divergence Analysis': 'In Progress',
+              'Implement Spot vs Perp CVD Analysis': 'Backlog',
+              'Implement Delta Volume Analysis': 'Backlog',
+              'Implement Liquidation Analysis': 'Backlog',
+              'Implement Funding Rate Analysis': 'Backlog',
+              'Implement Gamma Exposure Analysis': 'Loose Ideas',
+              'Implement Macro Events Analysis': 'Loose Ideas',
+              'Implement Cross-Asset Correlation Analysis': 'In Review',
+              'Implement On-Chain Analysis': 'Loose Ideas',
+              'Implement Signal Integration Service': 'ToDo',
+              'Implement Trading Signal Generator': 'ToDo',
+              'Implement Signal Visualization': 'Done',
+              'Implement Notification Service': 'Done'
+            };
+            
+            // Add issues to columns
+            for (const issue of issues.data) {
+              const category = issueCategories[issue.title] || 'Backlog';
+              const columnId = columnIds[category];
+              
+              if (columnId) {
+                await github.rest.projects.createCard({
+                  column_id: columnId,
+                  content_id: issue.id,
+                  content_type: 'Issue'
+                });
+                
+                console.log(`Added issue #${issue.number} (${issue.title}) to column ${category}`);
+              }
+            }
