@@ -1,137 +1,291 @@
 """
-Base model module.
+Base Model
 
-This module provides a base class for all models with common functionality.
+This module provides a base class for all models in the Trading Algorithm System.
 """
 
-from typing import Any, Dict, List, Optional, Union
-import os
 import json
+import os
+import pickle
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-# Import utilities
-from src.utils import get_logger, exception_handler, performance_monitor
+import numpy as np
+import pandas as pd
 
-# Import configuration
-from src.config import MODEL_WEIGHTS_DIR
+from src.config import Config
+from src.utils.error_handling import AppError
+from src.utils.logging_service import setup_logger
+from src.utils.performance import performance_timer
 
 
-class BaseModel:
+class ModelError(AppError):
+    """Exception raised for model errors."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        """
+        Initialize the error.
+
+        Args:
+            message: The error message.
+            details: Additional error details.
+        """
+        super().__init__(message, 500, details)
+
+
+class BaseModel(ABC):
     """
     Base class for all models.
-    
+
     This class provides common functionality for all models, including:
-    - Logging
-    - Weight management
-    - Serialization
+    - Model persistence
+    - Performance evaluation
+    - Hyperparameter management
+    - Model versioning
     """
-    
-    def __init__(self, name: str, asset_type: str = "BTC"):
+
+    def __init__(self, name: str, version: str = "0.1.0"):
         """
-        Initialize the base model.
-        
+        Initialize the model.
+
         Args:
-            name: Model name
-            asset_type: Asset type (BTC, SOL, BONK)
+            name: The name of the model.
+            version: The version of the model.
         """
         self.name = name
-        self.asset_type = asset_type
-        self.logger = get_logger(f"{name}Model")
+        self.version = version
+        self.logger = setup_logger(f"model.{name}")
+        self.hyperparameters: Dict[str, Any] = {}
+        self.metadata: Dict[str, Any] = {
+            "name": name,
+            "version": version,
+            "created_at": datetime.now().isoformat(),
+        }
+        self.model_dir = os.path.join(
+            Config.get("MODEL_WEIGHTS_DIR", "data/weights"), name
+        )
         
-        # Create weights directory if it doesn't exist
-        os.makedirs(MODEL_WEIGHTS_DIR, exist_ok=True)
-        
-        self.logger.info(f"{self.name} model initialized for {self.asset_type}")
-    
-    def get_weights_path(self) -> str:
+        # Create model directory if it doesn't exist
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir, exist_ok=True)
+
+    def set_hyperparameters(self, **kwargs: Any) -> None:
         """
-        Get the path to the weights file.
-        
-        Returns:
-            Path to the weights file
-        """
-        return os.path.join(MODEL_WEIGHTS_DIR, f"{self.name}_{self.asset_type}_weights.json")
-    
-    def save_weights(self, weights: Dict[str, Any]) -> None:
-        """
-        Save model weights to a file.
-        
+        Set hyperparameters for the model.
+
         Args:
-            weights: Model weights
+            **kwargs: Hyperparameter values.
         """
+        self.hyperparameters.update(kwargs)
+        self.logger.info(f"Set hyperparameters: {kwargs}")
+
+    def get_hyperparameter(self, name: str, default: Any = None) -> Any:
+        """
+        Get a hyperparameter value.
+
+        Args:
+            name: The name of the hyperparameter.
+            default: The default value to return if the hyperparameter is not set.
+
+        Returns:
+            The hyperparameter value.
+        """
+        return self.hyperparameters.get(name, default)
+
+    def save(self, filename: Optional[str] = None) -> str:
+        """
+        Save the model to disk.
+
+        Args:
+            filename: The filename to save the model to. If None, a default filename
+                     will be generated based on the model name and version.
+
+        Returns:
+            The path to the saved model.
+
+        Raises:
+            ModelError: If the model fails to save.
+        """
+        if filename is None:
+            filename = f"{self.name}_v{self.version.replace('.', '_')}.pkl"
+        
+        filepath = os.path.join(self.model_dir, filename)
+        
         try:
-            weights_path = self.get_weights_path()
+            # Save model state
+            model_state = self._get_model_state()
             
             # Add metadata
-            weights_with_metadata = {
-                "name": self.name,
-                "asset_type": self.asset_type,
-                "weights": weights
+            model_state["metadata"] = {
+                **self.metadata,
+                "saved_at": datetime.now().isoformat(),
+                "hyperparameters": self.hyperparameters,
             }
             
-            # Save to file
-            with open(weights_path, 'w') as f:
-                json.dump(weights_with_metadata, f, indent=2)
+            # Save to disk
+            with open(filepath, "wb") as f:
+                pickle.dump(model_state, f)
             
-            self.logger.info(f"Saved weights to {weights_path}")
-        
+            self.logger.info(f"Model saved to {filepath}")
+            
+            # Save metadata separately as JSON for easy inspection
+            metadata_path = os.path.splitext(filepath)[0] + ".json"
+            with open(metadata_path, "w") as f:
+                json.dump(model_state["metadata"], f, indent=2)
+            
+            return filepath
         except Exception as e:
-            self.logger.error(f"Error saving weights: {str(e)}")
-    
-    def load_weights(self) -> Optional[Dict[str, Any]]:
+            error_msg = f"Failed to save model to {filepath}: {str(e)}"
+            self.logger.error(error_msg)
+            raise ModelError(error_msg)
+
+    def load(self, filepath: str) -> None:
         """
-        Load model weights from a file.
-        
-        Returns:
-            Model weights, or None if not found
+        Load the model from disk.
+
+        Args:
+            filepath: The path to the saved model.
+
+        Raises:
+            ModelError: If the model fails to load.
         """
         try:
-            weights_path = self.get_weights_path()
+            with open(filepath, "rb") as f:
+                model_state = pickle.load(f)
             
-            # Check if file exists
-            if not os.path.exists(weights_path):
-                self.logger.warning(f"Weights file not found: {weights_path}")
-                return None
+            # Load metadata
+            if "metadata" in model_state:
+                self.metadata = model_state["metadata"]
+                self.name = self.metadata.get("name", self.name)
+                self.version = self.metadata.get("version", self.version)
+                self.hyperparameters = self.metadata.get("hyperparameters", {})
             
-            # Load from file
-            with open(weights_path, 'r') as f:
-                weights_with_metadata = json.load(f)
+            # Load model state
+            self._set_model_state(model_state)
             
-            # Extract weights
-            weights = weights_with_metadata.get("weights", {})
-            
-            self.logger.info(f"Loaded weights from {weights_path}")
-            return weights
-        
+            self.logger.info(f"Model loaded from {filepath}")
         except Exception as e:
-            self.logger.error(f"Error loading weights: {str(e)}")
-            return None
-    
-    @performance_monitor()
-    def predict(self, *args: Any, **kwargs: Any) -> Any:
+            error_msg = f"Failed to load model from {filepath}: {str(e)}"
+            self.logger.error(error_msg)
+            raise ModelError(error_msg)
+
+    @abstractmethod
+    def _get_model_state(self) -> Dict[str, Any]:
         """
-        Make a prediction.
-        
-        This method should be overridden by subclasses.
-        
+        Get the model state for saving.
+
+        Returns:
+            The model state as a dictionary.
+        """
+        pass
+
+    @abstractmethod
+    def _set_model_state(self, state: Dict[str, Any]) -> None:
+        """
+        Set the model state after loading.
+
         Args:
-            *args: Positional arguments
-            **kwargs: Keyword arguments
-            
-        Returns:
-            Prediction result
+            state: The model state as a dictionary.
         """
-        raise NotImplementedError("Subclasses must implement predict()")
-    
-    def get_model_info(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def train(self, data: pd.DataFrame, **kwargs: Any) -> Dict[str, Any]:
         """
-        Get model information.
-        
+        Train the model.
+
+        Args:
+            data: The training data.
+            **kwargs: Additional training parameters.
+
         Returns:
-            Dictionary with model information
+            A dictionary containing training metrics.
+        """
+        pass
+
+    @abstractmethod
+    def predict(self, data: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        """
+        Generate predictions.
+
+        Args:
+            data: The input data.
+            **kwargs: Additional prediction parameters.
+
+        Returns:
+            A DataFrame containing the predictions.
+        """
+        pass
+
+    @abstractmethod
+    def evaluate(self, data: pd.DataFrame, **kwargs: Any) -> Dict[str, Any]:
+        """
+        Evaluate the model.
+
+        Args:
+            data: The evaluation data.
+            **kwargs: Additional evaluation parameters.
+
+        Returns:
+            A dictionary containing evaluation metrics.
+        """
+        pass
+
+    def get_version_info(self) -> Dict[str, Any]:
+        """
+        Get version information for the model.
+
+        Returns:
+            A dictionary containing version information.
         """
         return {
             "name": self.name,
-            "asset_type": self.asset_type,
-            "weights_path": self.get_weights_path(),
-            "has_weights": os.path.exists(self.get_weights_path())
+            "version": self.version,
+            "created_at": self.metadata.get("created_at"),
+            "saved_at": self.metadata.get("saved_at"),
         }
+
+    @performance_timer
+    def _preprocess_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Preprocess data before training or prediction.
+
+        Args:
+            data: The input data.
+
+        Returns:
+            The preprocessed data.
+        """
+        return data.copy()
+
+    def _validate_data(self, data: pd.DataFrame) -> None:
+        """
+        Validate input data.
+
+        Args:
+            data: The input data.
+
+        Raises:
+            ModelError: If the data is invalid.
+        """
+        if data is None or data.empty:
+            raise ModelError("Input data is empty")
+        
+        # Check for required columns (to be implemented by subclasses)
+        required_columns = self._get_required_columns()
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        
+        if missing_columns:
+            raise ModelError(
+                f"Missing required columns: {', '.join(missing_columns)}"
+            )
+    
+    def _get_required_columns(self) -> List[str]:
+        """
+        Get the list of required columns for input data.
+
+        Returns:
+            A list of required column names.
+        """
+        return []

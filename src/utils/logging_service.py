@@ -1,232 +1,81 @@
 """
-Logging service module.
+Logging Service
 
-This module provides a centralized logging service with configurable
-outputs, log levels, and formatting.
+This module provides centralized logging functionality for the Trading Algorithm System.
 """
 
+import logging
 import os
 import sys
-import logging
 from logging.handlers import RotatingFileHandler
-from typing import Optional, Dict, Any, Union
-from datetime import datetime
+from typing import Optional, Union
 
-# Import configuration
-try:
-    from src.config import LOG_LEVEL, APP_MODE
-except ImportError:
-    # Default values if config not available
-    LOG_LEVEL = "INFO"
-    APP_MODE = "development"
+# Default log format
+DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Default log level
+DEFAULT_LEVEL = logging.INFO
+
+# Default log file
+DEFAULT_LOG_FILE = "app.log"
+
+# Maximum log file size (10 MB)
+MAX_LOG_SIZE = 10 * 1024 * 1024
+
+# Maximum number of backup log files
+BACKUP_COUNT = 5
 
 
-class LoggingService:
+def setup_logger(
+    name: str,
+    level: Optional[Union[int, str]] = None,
+    log_format: str = DEFAULT_FORMAT,
+    log_file: Optional[str] = None,
+    console: bool = True,
+) -> logging.Logger:
     """
-    Centralized logging service with configurable outputs and formatting.
-    
-    This class provides a consistent logging interface across the application
-    with support for console output, file output, and configurable log levels.
-    """
-    
-    # Log level mapping
-    LOG_LEVELS = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL
-    }
-    
-    # Singleton instance
-    _instance = None
-    
-    def __new__(cls, *args, **kwargs):
-        """Ensure singleton pattern."""
-        if cls._instance is None:
-            cls._instance = super(LoggingService, cls).__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
-    
-    def __init__(self, 
-                 name: str = "TradingSystem", 
-                 log_level: str = LOG_LEVEL,
-                 log_to_console: bool = True,
-                 log_to_file: bool = True,
-                 log_file_path: Optional[str] = None,
-                 max_file_size_mb: int = 10,
-                 backup_count: int = 5):
-        """
-        Initialize the logging service.
-        
-        Args:
-            name: Logger name
-            log_level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-            log_to_console: Whether to log to console
-            log_to_file: Whether to log to file
-            log_file_path: Path to log file (default: logs/{name}_{date}.log)
-            max_file_size_mb: Maximum log file size in MB
-            backup_count: Number of backup log files to keep
-        """
-        # Skip initialization if already initialized
-        if self._initialized:
-            return
-        
-        self.name = name
-        self.log_level_name = log_level.upper()
-        self.log_level = self.LOG_LEVELS.get(self.log_level_name, logging.INFO)
-        self.log_to_console = log_to_console
-        self.log_to_file = log_to_file
-        
-        # Set up log file path
-        if log_file_path is None:
-            os.makedirs("logs", exist_ok=True)
-            date_str = datetime.now().strftime("%Y%m%d")
-            self.log_file_path = f"logs/{name.lower()}_{date_str}.log"
-        else:
-            self.log_file_path = log_file_path
-            # Ensure directory exists
-            log_dir = os.path.dirname(log_file_path)
-            if log_dir:
-                os.makedirs(log_dir, exist_ok=True)
-        
-        self.max_file_size = max_file_size_mb * 1024 * 1024  # Convert MB to bytes
-        self.backup_count = backup_count
-        
-        # Create logger
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(self.log_level)
-        self.logger.propagate = False
-        
-        # Clear existing handlers
-        if self.logger.handlers:
-            self.logger.handlers.clear()
-        
-        # Create formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        
-        # Add console handler
-        if log_to_console:
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setFormatter(formatter)
-            self.logger.addHandler(console_handler)
-        
-        # Add file handler
-        if log_to_file:
-            file_handler = RotatingFileHandler(
-                self.log_file_path,
-                maxBytes=self.max_file_size,
-                backupCount=self.backup_count
-            )
-            file_handler.setFormatter(formatter)
-            self.logger.addHandler(file_handler)
-        
-        self._initialized = True
-        
-        # Log initialization
-        self.logger.info(f"Logging service initialized: {name} ({self.log_level_name})")
-        if log_to_file:
-            self.logger.info(f"Logging to file: {self.log_file_path}")
-    
-    def get_logger(self) -> logging.Logger:
-        """
-        Get the logger instance.
-        
-        Returns:
-            The logger instance
-        """
-        return self.logger
-    
-    def debug(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Log a debug message.
-        
-        Args:
-            message: The message to log
-            extra: Extra data to include in the log
-        """
-        self.logger.debug(message, extra=extra)
-    
-    def info(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Log an info message.
-        
-        Args:
-            message: The message to log
-            extra: Extra data to include in the log
-        """
-        self.logger.info(message, extra=extra)
-    
-    def warning(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Log a warning message.
-        
-        Args:
-            message: The message to log
-            extra: Extra data to include in the log
-        """
-        self.logger.warning(message, extra=extra)
-    
-    def error(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Log an error message.
-        
-        Args:
-            message: The message to log
-            extra: Extra data to include in the log
-        """
-        self.logger.error(message, extra=extra)
-    
-    def critical(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Log a critical message.
-        
-        Args:
-            message: The message to log
-            extra: Extra data to include in the log
-        """
-        self.logger.critical(message, extra=extra)
-    
-    def exception(self, message: str, exc_info: bool = True, extra: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Log an exception message.
-        
-        Args:
-            message: The message to log
-            exc_info: Whether to include exception info
-            extra: Extra data to include in the log
-        """
-        self.logger.exception(message, exc_info=exc_info, extra=extra)
+    Set up a logger with the specified configuration.
 
-
-# Create default logger instance
-default_logger = LoggingService()
-
-
-def get_logger(name: str = "TradingSystem") -> LoggingService:
-    """
-    Get a logger instance with the specified name.
-    
     Args:
-        name: The logger name
-        
+        name: The name of the logger.
+        level: The log level. Defaults to the value from the LOG_LEVEL environment variable,
+               or INFO if not set.
+        log_format: The log format string.
+        log_file: The log file path. If None, logs will only be sent to the console.
+        console: Whether to log to the console.
+
     Returns:
-        A LoggingService instance
+        The configured logger.
     """
-    return LoggingService(name=name)
+    # Get the logger
+    logger = logging.getLogger(name)
 
+    # Set the log level
+    if level is None:
+        level = os.environ.get("LOG_LEVEL", DEFAULT_LEVEL)
+    logger.setLevel(level)
 
-if __name__ == "__main__":
-    # Example usage
-    logger = get_logger("ExampleLogger")
-    logger.info("This is an info message")
-    logger.warning("This is a warning message")
-    logger.error("This is an error message")
-    
-    try:
-        # Generate an exception
-        result = 1 / 0
-    except Exception as e:
-        logger.exception(f"An exception occurred: {e}")
+    # Create formatter
+    formatter = logging.Formatter(log_format)
+
+    # Add console handler if requested
+    if console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+    # Add file handler if log_file is specified
+    if log_file:
+        # Create the directory if it doesn't exist
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        # Create rotating file handler
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=MAX_LOG_SIZE, backupCount=BACKUP_COUNT
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+    return logger
