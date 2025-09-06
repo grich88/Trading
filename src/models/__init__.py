@@ -5,11 +5,11 @@ This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-from src.models.liquidation_map_analyzer import LiquidationMapAnalyzer, normalize_liquidations, analyze_liquidation_map
+from src.models.funding_rate_analyzer import FundingRateAnalyzer, detect_funding_anomalies, analyze_funding_rates
 
 __all__ = [
     'BaseModel',
-    'LiquidationMapAnalyzer',
-    'normalize_liquidations',
-    'analyze_liquidation_map'
+    'FundingRateAnalyzer',
+    'detect_funding_anomalies',
+    'analyze_funding_rates'
 ]
