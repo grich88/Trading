@@ -1,4 +1,4 @@
-name: Setup Project Board
+now create issues that needname: Setup Project Board
 
 on:
   workflow_dispatch:
