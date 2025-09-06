@@ -6,9 +6,13 @@ that loads settings from environment variables with sensible defaults.
 """
 
 import os
+import sys
 from typing import Any, Dict, Optional, Union, List
 from dotenv import load_dotenv
 import logging
+
+from .defaults import get_default, get_all_defaults
+from .validators import validate_config
 
 # Load environment variables from .env file if it exists
 load_dotenv()
@@ -41,6 +45,10 @@ class Config:
         Returns:
             The string value
         """
+        # Use default from defaults module if not provided
+        if default is None:
+            default = get_default(key)
+            
         value = os.environ.get(key, default)
         if value is None:
             logger.warning(f"Configuration key '{key}' not found and no default provided")
@@ -59,6 +67,15 @@ class Config:
         Returns:
             The integer value
         """
+        # Use default from defaults module if not provided
+        if default is None:
+            default_val = get_default(key)
+            if default_val is not None:
+                try:
+                    default = int(default_val)
+                except (ValueError, TypeError):
+                    pass
+                    
         value = os.environ.get(key)
         if value is None:
             if default is None:
@@ -84,6 +101,15 @@ class Config:
         Returns:
             The float value
         """
+        # Use default from defaults module if not provided
+        if default is None:
+            default_val = get_default(key)
+            if default_val is not None:
+                try:
+                    default = float(default_val)
+                except (ValueError, TypeError):
+                    pass
+                    
         value = os.environ.get(key)
         if value is None:
             if default is None:
@@ -109,6 +135,15 @@ class Config:
         Returns:
             The boolean value
         """
+        # Use default from defaults module if not provided
+        if default is None:
+            default_val = get_default(key)
+            if default_val is not None:
+                if isinstance(default_val, bool):
+                    default = default_val
+                elif isinstance(default_val, str):
+                    default = default_val.lower() in ('true', 'yes', '1', 't', 'y')
+                    
         value = os.environ.get(key)
         if value is None:
             if default is None:
@@ -131,6 +166,12 @@ class Config:
         Returns:
             The list value
         """
+        # Use default from defaults module if not provided
+        if default is None:
+            default_val = get_default(key)
+            if default_val is not None and isinstance(default_val, list):
+                default = default_val
+                    
         value = os.environ.get(key)
         if value is None:
             if default is None:
@@ -240,6 +281,27 @@ def print_config() -> None:
             logger.info(f"  {key}: {value}")
 
 
+def validate_all_config() -> bool:
+    """
+    Validate the entire configuration.
+    
+    Returns:
+        True if configuration is valid, False otherwise
+    """
+    config = get_config_dict()
+    errors = validate_config(config)
+    
+    if errors:
+        logger.error("Configuration validation failed:")
+        for error in errors:
+            logger.error(f"  - {error}")
+        return False
+    
+    logger.info("Configuration validation successful")
+    return True
+
+
 if __name__ == "__main__":
     # Example usage
     print_config()
+    validate_all_config()
