@@ -1,11 +1,11 @@
 """
-Core package.
+Core Module
 
-This package provides the core application logic.
+This module contains the core application logic for the Trading Algorithm System.
 """
 
-from src.core.app import TradingApp
+from src.core.app import App
 
 __all__ = [
-    'TradingApp'
+    "App",
 ]

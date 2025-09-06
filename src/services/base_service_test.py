@@ -2,185 +2,163 @@
 Tests for the base service module.
 """
 
-import unittest
-from unittest.mock import patch, MagicMock
 import threading
 import time
+from unittest import mock
 
-from src.services.base_service import BaseService, LongRunningService
+import pytest
 
-
-class TestBaseService(unittest.TestCase):
-    """Test cases for the BaseService class."""
-    
-    def test_initialization(self):
-        """Test service initialization."""
-        service = BaseService("TestService")
-        self.assertEqual(service.name, "TestService")
-        self.assertFalse(service.running)
-        self.assertIsNone(service.start_time)
-    
-    def test_start_stop(self):
-        """Test service start and stop."""
-        service = BaseService("TestService")
-        
-        # Test start
-        self.assertTrue(service.start())
-        self.assertTrue(service.running)
-        self.assertIsNotNone(service.start_time)
-        
-        # Test stop
-        self.assertTrue(service.stop())
-        self.assertFalse(service.running)
-    
-    def test_health_check(self):
-        """Test health check."""
-        service = BaseService("TestService")
-        service.start()
-        
-        # Check health
-        health = service.check_health()
-        self.assertEqual(health["status"], "running")
-        self.assertGreaterEqual(health["uptime_seconds"], 0)
-        
-        service.stop()
-    
-    def test_process_batch(self):
-        """Test batch processing."""
-        service = BaseService("TestService", enable_memory_monitoring=True)
-        service.start()
-        
-        # Define process function
-        def process_func(items):
-            return [item * 2 for item in items]
-        
-        # Process items
-        items = list(range(10))
-        results = service.process_batch(items, process_func)
-        
-        # Check results
-        self.assertEqual(results, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18])
-        
-        service.stop()
-    
-    @patch("src.services.base_service.performance_monitor")
-    def test_execute_with_monitoring(self, mock_monitor):
-        """Test execute with monitoring."""
-        service = BaseService("TestService")
-        
-        # Define test function
-        def test_func(a, b):
-            return a + b
-        
-        # Set up mock
-        mock_decorator = MagicMock()
-        mock_monitor.return_value = mock_decorator
-        mock_wrapped = MagicMock()
-        mock_decorator.return_value = mock_wrapped
-        mock_wrapped.return_value = 42
-        
-        # Execute function
-        result = service.execute_with_monitoring(test_func, 10, 32)
-        
-        # Check result
-        self.assertEqual(result, 42)
-        mock_monitor.assert_called_once()
-        mock_decorator.assert_called_once()
-        mock_wrapped.assert_called_once()
-    
-    @patch("src.services.base_service.exception_handler")
-    def test_execute_with_error_handling(self, mock_handler):
-        """Test execute with error handling."""
-        service = BaseService("TestService")
-        
-        # Define test function
-        def test_func(a, b):
-            return a / b
-        
-        # Set up mock
-        mock_decorator = MagicMock()
-        mock_handler.return_value = mock_decorator
-        mock_wrapped = MagicMock()
-        mock_decorator.return_value = mock_wrapped
-        mock_wrapped.return_value = 5
-        
-        # Execute function
-        result = service.execute_with_error_handling(test_func, 10, 2)
-        
-        # Check result
-        self.assertEqual(result, 5)
-        mock_handler.assert_called_once_with(log_exception=True)
-        mock_decorator.assert_called_once()
-        mock_wrapped.assert_called_once()
+from src.services.base_service import BaseService, ServiceError
 
 
-class TestLongRunningService(unittest.TestCase):
-    """Test cases for the LongRunningService class."""
+class TestService(BaseService):
+    """Test service implementation for testing."""
     
-    def test_initialization(self):
-        """Test service initialization."""
-        service = LongRunningService("TestService", worker_count=2)
-        self.assertEqual(service.name, "TestService")
-        self.assertEqual(service.worker_count, 2)
-        self.assertEqual(len(service.worker_threads), 0)
-        self.assertEqual(len(service.task_queue), 0)
+    def __init__(self, name="test"):
+        super().__init__(name)
+        self.initialized = False
+        self.cleaned_up = False
+        self.status = "idle"
     
-    def test_start_stop(self):
-        """Test service start and stop."""
-        service = LongRunningService("TestService", worker_count=2)
-        
-        # Test start
-        self.assertTrue(service.start())
-        self.assertTrue(service.running)
-        self.assertEqual(len(service.worker_threads), 2)
-        
-        # Test stop
-        self.assertTrue(service.stop())
-        self.assertFalse(service.running)
-        self.assertEqual(len(service.worker_threads), 0)
+    def _initialize_resources(self):
+        self.initialized = True
+        self.status = "initialized"
     
-    def test_add_task(self):
-        """Test adding tasks to the queue."""
-        service = LongRunningService("TestService", worker_count=1)
-        
-        # Add tasks
-        service.add_task("Task 1")
-        service.add_task("Task 2")
-        
-        # Check queue size
-        self.assertEqual(service.get_queue_size(), 2)
+    def _cleanup_resources(self):
+        self.cleaned_up = True
+        self.status = "cleaned_up"
     
-    def test_process_task(self):
-        """Test task processing."""
-        # Create a subclass that implements _process_task
-        class TestService(LongRunningService):
-            def __init__(self):
-                super().__init__("TestService", worker_count=1)
-                self.processed_tasks = []
-            
-            def _process_task(self, task):
-                self.processed_tasks.append(task)
-        
-        # Create service
-        service = TestService()
-        service.start()
-        
-        # Add tasks
-        service.add_task("Task 1")
-        service.add_task("Task 2")
-        
-        # Wait for tasks to be processed
-        time.sleep(0.5)
-        
-        # Check processed tasks
-        self.assertIn("Task 1", service.processed_tasks)
-        self.assertIn("Task 2", service.processed_tasks)
-        
-        # Check queue size
-        self.assertEqual(service.get_queue_size(), 0)
-        
-        service.stop()
+    def get_status(self):
+        return {"status": self.status}
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_service_lifecycle():
+    """Test service lifecycle (init, start, stop)."""
+    # Create service
+    service = TestService()
+    
+    # Check initial state
+    assert service.name == "test"
+    assert service.running is False
+    assert service.initialized is False
+    assert service.cleaned_up is False
+    
+    # Start service
+    service.start()
+    
+    # Check running state
+    assert service.running is True
+    assert service.initialized is True
+    assert service.cleaned_up is False
+    
+    # Stop service
+    service.stop()
+    
+    # Check stopped state
+    assert service.running is False
+    assert service.initialized is True
+    assert service.cleaned_up is True
+
+
+def test_service_start_error():
+    """Test error handling during service start."""
+    # Create service with error in initialization
+    service = TestService()
+    
+    # Mock _initialize_resources to raise an exception
+    with mock.patch.object(service, '_initialize_resources', side_effect=Exception("Test error")):
+        # Start service should raise ServiceError
+        with pytest.raises(ServiceError):
+            service.start()
+        
+        # Service should not be running
+        assert service.running is False
+
+
+def test_service_stop_error():
+    """Test error handling during service stop."""
+    # Create and start service
+    service = TestService()
+    service.start()
+    
+    # Mock _cleanup_resources to raise an exception
+    with mock.patch.object(service, '_cleanup_resources', side_effect=Exception("Test error")):
+        # Stop service should raise ServiceError
+        with pytest.raises(ServiceError):
+            service.stop()
+
+
+def test_service_health_check():
+    """Test service health check."""
+    # Create service
+    service = TestService()
+    
+    # Check health before starting
+    health = service.check_health()
+    assert health["name"] == "test"
+    assert health["status"] == "stopped"
+    assert "memory_usage" in health
+    
+    # Start service
+    service.start()
+    
+    # Check health after starting
+    health = service.check_health()
+    assert health["name"] == "test"
+    assert health["status"] == "running"
+    assert "memory_usage" in health
+    
+    # Stop service
+    service.stop()
+
+
+def test_memory_monitoring():
+    """Test memory monitoring functionality."""
+    # Create service with short memory check interval
+    service = TestService()
+    service.memory_check_interval = 0.1
+    
+    # Start service
+    service.start()
+    
+    # Check that memory monitor thread is running
+    assert service.memory_monitor_thread is not None
+    assert service.memory_monitor_thread.is_alive()
+    
+    # Wait for a few memory check intervals
+    time.sleep(0.3)
+    
+    # Stop service
+    service.stop()
+    
+    # Check that memory monitor thread is stopped
+    assert not service.memory_monitor_thread.is_alive()
+
+
+def test_batch_size_adjustment():
+    """Test batch size adjustment based on memory usage."""
+    # Create service
+    service = TestService()
+    
+    # Set initial batch size
+    service.current_batch_size = 100
+    
+    # Test reducing batch size
+    service._reduce_batch_size()
+    assert service.current_batch_size == 70  # 100 * 0.7
+    
+    # Test increasing batch size
+    service._increase_batch_size()
+    assert service.current_batch_size == 84  # 70 * 1.2
+    
+    # Test minimum batch size
+    service.current_batch_size = 5
+    service.min_batch_size = 10
+    service._reduce_batch_size()
+    assert service.current_batch_size == 10  # min_batch_size
+    
+    # Test maximum batch size
+    service.current_batch_size = 900
+    service.max_batch_size = 1000
+    service._increase_batch_size()
+    assert service.current_batch_size == 1000  # max_batch_size
