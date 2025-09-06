@@ -37,9 +37,17 @@ from src.utils.error_handling import (
 
 from src.utils.performance import (
     performance_monitor,
+    async_performance_monitor,
     MemoryMonitor,
     get_memory_monitor,
-    adaptive_batch_processing
+    adaptive_batch_processing,
+    async_adaptive_batch_processing,
+    timer,
+    memory_usage,
+    profiler,
+    SystemProfiler,
+    run_with_profiling,
+    run_with_async_profiling
 )
 
 __all__ = [
@@ -74,7 +82,15 @@ __all__ = [
     
     # Performance
     'performance_monitor',
+    'async_performance_monitor',
     'MemoryMonitor',
     'get_memory_monitor',
-    'adaptive_batch_processing'
+    'adaptive_batch_processing',
+    'async_adaptive_batch_processing',
+    'timer',
+    'memory_usage',
+    'profiler',
+    'SystemProfiler',
+    'run_with_profiling',
+    'run_with_async_profiling'
 ]
