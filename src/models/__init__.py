@@ -5,11 +5,11 @@ This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-from src.models.macro_events_analyzer import MacroEventsAnalyzer, analyze_cpi_impact, analyze_macro_events
+from src.models.correlations_analyzer import CorrelationsAnalyzer, calculate_correlations, analyze_correlations
 
 __all__ = [
     'BaseModel',
-    'MacroEventsAnalyzer',
-    'analyze_cpi_impact',
-    'analyze_macro_events'
+    'CorrelationsAnalyzer',
+    'calculate_correlations',
+    'analyze_correlations'
 ]
