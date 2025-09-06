@@ -5,11 +5,11 @@ This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-from src.models.cvd_analyzer import CVDAnalyzer, calculate_cvd, analyze_spot_perp_cvd
+from src.models.delta_volume_analyzer import DeltaVolumeAnalyzer, calculate_delta_volume, analyze_delta_volume
 
 __all__ = [
     'BaseModel',
-    'CVDAnalyzer',
-    'calculate_cvd',
-    'analyze_spot_perp_cvd'
+    'DeltaVolumeAnalyzer',
+    'calculate_delta_volume',
+    'analyze_delta_volume'
 ]
