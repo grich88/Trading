@@ -5,11 +5,11 @@ This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-from src.models.gamma_exposure_analyzer import GammaExposureAnalyzer, calculate_gamma_exposure, analyze_gamma_exposure
+from src.models.macro_events_analyzer import MacroEventsAnalyzer, analyze_cpi_impact, analyze_macro_events
 
 __all__ = [
     'BaseModel',
-    'GammaExposureAnalyzer',
-    'calculate_gamma_exposure',
-    'analyze_gamma_exposure'
+    'MacroEventsAnalyzer',
+    'analyze_cpi_impact',
+    'analyze_macro_events'
 ]
