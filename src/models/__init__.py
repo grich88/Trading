@@ -5,11 +5,11 @@ This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-from src.models.correlations_analyzer import CorrelationsAnalyzer, calculate_correlations, analyze_correlations
+from src.models.onchain_flows_analyzer import OnChainFlowsAnalyzer, analyze_onchain_flows, track_whale_movements
 
 __all__ = [
     'BaseModel',
-    'CorrelationsAnalyzer',
-    'calculate_correlations',
-    'analyze_correlations'
+    'OnChainFlowsAnalyzer',
+    'analyze_onchain_flows',
+    'track_whale_movements'
 ]
