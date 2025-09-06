@@ -5,11 +5,11 @@ This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-from src.models.delta_volume_analyzer import DeltaVolumeAnalyzer, calculate_delta_volume, analyze_delta_volume
+from src.models.liquidation_map_analyzer import LiquidationMapAnalyzer, normalize_liquidations, analyze_liquidation_map
 
 __all__ = [
     'BaseModel',
-    'DeltaVolumeAnalyzer',
-    'calculate_delta_volume',
-    'analyze_delta_volume'
+    'LiquidationMapAnalyzer',
+    'normalize_liquidations',
+    'analyze_liquidation_map'
 ]
