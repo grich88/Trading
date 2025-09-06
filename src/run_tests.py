@@ -1,88 +1,135 @@
+#!/usr/bin/env python3
 """
-Test runner module.
+Test Runner
 
-This module provides a test runner for the application.
+This script runs all tests for the Trading Algorithm System.
 """
 
+import argparse
 import os
 import sys
-import unittest
-import argparse
+from typing import List, Optional
+
+import pytest
 
 
-def discover_tests(start_dir='.', pattern='*_test.py'):
+def parse_args() -> argparse.Namespace:
     """
-    Discover and load tests from the specified directory.
-    
-    Args:
-        start_dir: Directory to start discovery
-        pattern: Pattern for test files
-        
+    Parse command-line arguments.
+
     Returns:
-        Test suite
+        The parsed arguments.
     """
-    loader = unittest.TestLoader()
-    suite = loader.discover(start_dir, pattern=pattern)
-    return suite
-
-
-def run_tests(start_dir='.', pattern='*_test.py', verbosity=1):
-    """
-    Run tests from the specified directory.
-    
-    Args:
-        start_dir: Directory to start discovery
-        pattern: Pattern for test files
-        verbosity: Verbosity level
-        
-    Returns:
-        Test result
-    """
-    suite = discover_tests(start_dir, pattern)
-    runner = unittest.TextTestRunner(verbosity=verbosity)
-    result = runner.run(suite)
-    return result
-
-
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Test Runner")
+    parser = argparse.ArgumentParser(description="Run tests for the Trading Algorithm System")
     
     parser.add_argument(
-        "--dir",
-        type=str,
-        default="src",
-        help="Directory to start test discovery"
+        "--path",
+        help="Path to test file or directory",
     )
-    
     parser.add_argument(
-        "--pattern",
-        type=str,
-        default="*_test.py",
-        help="Pattern for test files"
+        "--verbose", "-v",
+        action="store_true",
+        help="Verbose output",
     )
-    
     parser.add_argument(
-        "--verbosity",
-        type=int,
-        default=2,
-        help="Verbosity level"
+        "--coverage",
+        action="store_true",
+        help="Generate coverage report",
+    )
+    parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Generate HTML coverage report",
+    )
+    parser.add_argument(
+        "--xml",
+        action="store_true",
+        help="Generate XML coverage report",
+    )
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Run tests in parallel",
     )
     
     return parser.parse_args()
 
 
-def main():
-    """Main entry point for the test runner."""
-    # Parse command line arguments
+def run_tests(
+    path: Optional[str] = None,
+    verbose: bool = False,
+    coverage: bool = False,
+    html: bool = False,
+    xml: bool = False,
+    parallel: bool = False,
+) -> int:
+    """
+    Run tests.
+
+    Args:
+        path: Path to test file or directory.
+        verbose: Whether to use verbose output.
+        coverage: Whether to generate a coverage report.
+        html: Whether to generate an HTML coverage report.
+        xml: Whether to generate an XML coverage report.
+        parallel: Whether to run tests in parallel.
+
+    Returns:
+        The exit code (0 for success, non-zero for failure).
+    """
+    # Set up pytest arguments
+    args: List[str] = []
+    
+    # Add path if specified
+    if path:
+        args.append(path)
+    else:
+        args.append("src")
+    
+    # Add verbosity
+    if verbose:
+        args.append("-v")
+    
+    # Add coverage
+    if coverage or html or xml:
+        args.append("--cov=src")
+        
+        if html:
+            args.append("--cov-report=html")
+        
+        if xml:
+            args.append("--cov-report=xml")
+        
+        if coverage:
+            args.append("--cov-report=term-missing")
+    
+    # Add parallel
+    if parallel:
+        args.append("-xvs")
+    
+    # Run pytest
+    return pytest.main(args)
+
+
+def main() -> None:
+    """
+    Main entry point for the test runner.
+    """
     args = parse_args()
     
     # Run tests
-    result = run_tests(args.dir, args.pattern, args.verbosity)
+    exit_code = run_tests(
+        path=args.path,
+        verbose=args.verbose,
+        coverage=args.coverage,
+        html=args.html,
+        xml=args.xml,
+        parallel=args.parallel,
+    )
     
-    # Return exit code
-    return 0 if result.wasSuccessful() else 1
+    # Exit with the test result
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
