@@ -1,22 +1,17 @@
 """
-Default Configuration Values
+Default configuration values.
 
-This module defines default configuration values for the application.
+This module contains default values for all configuration settings.
+These are used when environment variables are not set.
 """
 
 from typing import Dict, Any
 
-# Default configuration values
-DEFAULT_CONFIG: Dict[str, Any] = {
+# Core configuration defaults
+DEFAULT_CONFIG = {
     # Application settings
     "APP_MODE": "development",
     "LOG_LEVEL": "INFO",
-    
-    # Data settings
-    "DEFAULT_TIMEFRAME": "4h",
-    "DATA_DIR": "data",
-    "HISTORICAL_DATA_START_DATE": "2023-01-01",
-    "HISTORICAL_DATA_END_DATE": "2023-12-31",
     
     # API credentials
     "COINGLASS_API_KEY": "",
@@ -24,7 +19,13 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "EXCHANGE_API_KEY": "",
     "EXCHANGE_API_SECRET": "",
     
-    # Model settings
+    # Data collection
+    "DEFAULT_TIMEFRAME": "4h",
+    "DATA_DIR": "data",
+    "HISTORICAL_DATA_START_DATE": "2023-01-01",
+    "HISTORICAL_DATA_END_DATE": "",
+    
+    # Model configuration
     "MODEL_WEIGHTS_DIR": "data/weights",
     "DEFAULT_WINDOW_SIZE": 60,
     "DEFAULT_LOOKAHEAD_CANDLES": 10,
@@ -52,35 +53,45 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "SMTP_PASSWORD": "",
     "NOTIFICATION_EMAIL_FROM": "alerts@example.com",
     "NOTIFICATION_EMAIL_TO": "",
+    
+    # Trading parameters
+    "DEFAULT_SYMBOL": "BTC/USDT",
+    "TRADING_ENABLED": False,
+    "MAX_POSITION_SIZE_USD": 1000.0,
+    "RISK_PER_TRADE_PERCENT": 1.0,
+    "STOP_LOSS_PERCENT": 2.0,
+    "TAKE_PROFIT_PERCENT": 4.0,
+    "MAX_OPEN_POSITIONS": 3,
+    
+    # Signal thresholds
+    "RSI_OVERSOLD": 30,
+    "RSI_OVERBOUGHT": 70,
+    "VOLUME_SURGE_THRESHOLD": 2.0,
+    "LIQUIDATION_THRESHOLD_USD": 5000000,
+    "FUNDING_RATE_THRESHOLD": 0.01,
+    "PRICE_DIVERGENCE_THRESHOLD": 0.02,
+    "CVD_DIVERGENCE_THRESHOLD": 0.05,
+    "AGGRESSOR_VOLUME_THRESHOLD": 0.7
 }
 
-# Asset-specific default parameters
-ASSET_DEFAULTS: Dict[str, Dict[str, Any]] = {
-    "BTC": {
-        "window_size": 60,
-        "lookahead_candles": 10,
-        "min_abs_score": 0.425,
-        "regime_filter": True,
-        "fee_bps": 5.0,
-        "adaptive_cutoff": True,
-        "min_agree_features": 1,
-    },
-    "SOL": {
-        "window_size": 40,
-        "lookahead_candles": 10,
-        "min_abs_score": 0.520,
-        "regime_filter": True,
-        "fee_bps": 5.0,
-        "adaptive_cutoff": True,
-        "min_agree_features": 1,
-    },
-    "BONK": {
-        "window_size": 40,
-        "lookahead_candles": 10,
-        "min_abs_score": 0.550,
-        "regime_filter": True,
-        "fee_bps": 5.0,
-        "adaptive_cutoff": True,
-        "min_agree_features": 1,
-    },
-}
+def get_default(key: str) -> Any:
+    """
+    Get a default configuration value.
+    
+    Args:
+        key: The configuration key
+        
+    Returns:
+        The default value or None if not found
+    """
+    return DEFAULT_CONFIG.get(key)
+
+
+def get_all_defaults() -> Dict[str, Any]:
+    """
+    Get all default configuration values.
+    
+    Returns:
+        Dictionary of all default values
+    """
+    return DEFAULT_CONFIG.copy()

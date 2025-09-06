@@ -1,194 +1,216 @@
 """
-Configuration Validators
+Configuration validation module.
 
-This module provides validation functions for configuration values.
+This module provides validation functions for configuration values
+to ensure they meet required constraints.
 """
 
-import os
-from typing import Any, Dict, List, Optional, Set, Union
+import re
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Union, Tuple
 
-from src.utils.error_handling import ValidationError
-from src.utils.logging_service import setup_logger
+# Regular expression patterns for validation
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+URL_PATTERN = re.compile(r'^https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+')
+DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+TIMEFRAME_PATTERN = re.compile(r'^[1-9]\d*[mhdwM]$')
+SYMBOL_PATTERN = re.compile(r'^[A-Z0-9]+/[A-Z0-9]+$')
 
-# Set up logger
-logger = setup_logger(__name__)
+
+class ValidationError(Exception):
+    """Exception raised for configuration validation errors."""
+    pass
 
 
-def validate_required_config(
-    config: Dict[str, Any], required_keys: List[str]
-) -> None:
+def validate_email(value: str) -> bool:
     """
-    Validate that all required configuration keys are present and not empty.
-
+    Validate an email address.
+    
     Args:
-        config: The configuration dictionary to validate.
-        required_keys: The list of required configuration keys.
-
-    Raises:
-        ValidationError: If any required configuration key is missing or empty.
+        value: The email address to validate
+        
+    Returns:
+        True if valid, False otherwise
     """
-    missing_keys = []
-    empty_keys = []
-
-    for key in required_keys:
-        if key not in config:
-            missing_keys.append(key)
-        elif not config[key] and not isinstance(config[key], (bool, int, float)):
-            empty_keys.append(key)
-
-    if missing_keys:
-        raise ValidationError(
-            f"Missing required configuration keys: {', '.join(missing_keys)}"
-        )
-
-    if empty_keys:
-        raise ValidationError(
-            f"Empty required configuration keys: {', '.join(empty_keys)}"
-        )
+    return bool(EMAIL_PATTERN.match(value)) if value else True
 
 
-def validate_directory(directory: str, create: bool = False) -> None:
+def validate_url(value: str) -> bool:
     """
-    Validate that a directory exists and is writable.
-
+    Validate a URL.
+    
     Args:
-        directory: The directory path to validate.
-        create: Whether to create the directory if it doesn't exist.
-
-    Raises:
-        ValidationError: If the directory doesn't exist or isn't writable.
+        value: The URL to validate
+        
+    Returns:
+        True if valid, False otherwise
     """
-    if not os.path.exists(directory):
-        if create:
-            try:
-                os.makedirs(directory, exist_ok=True)
-                logger.info(f"Created directory: {directory}")
-            except Exception as e:
-                raise ValidationError(
-                    f"Failed to create directory {directory}: {str(e)}"
-                )
-        else:
-            raise ValidationError(f"Directory does not exist: {directory}")
-
-    if not os.path.isdir(directory):
-        raise ValidationError(f"Not a directory: {directory}")
-
-    if not os.access(directory, os.W_OK):
-        raise ValidationError(f"Directory is not writable: {directory}")
+    return bool(URL_PATTERN.match(value)) if value else True
 
 
-def validate_api_credentials(
-    api_key: str, api_secret: Optional[str] = None
-) -> None:
+def validate_date(value: str) -> bool:
     """
-    Validate API credentials.
-
+    Validate a date string in YYYY-MM-DD format.
+    
     Args:
-        api_key: The API key to validate.
-        api_secret: The API secret to validate (optional).
-
-    Raises:
-        ValidationError: If the API credentials are invalid.
+        value: The date string to validate
+        
+    Returns:
+        True if valid, False otherwise
     """
-    if not api_key:
-        raise ValidationError("API key is required")
+    if not value:
+        return True
+    
+    if not DATE_PATTERN.match(value):
+        return False
+    
+    try:
+        datetime.strptime(value, '%Y-%m-%d')
+        return True
+    except ValueError:
+        return False
 
-    if api_secret is not None and not api_secret:
-        raise ValidationError("API secret is required")
 
-
-def validate_numeric_range(
-    value: Union[int, float],
-    min_value: Optional[Union[int, float]] = None,
-    max_value: Optional[Union[int, float]] = None,
-    name: str = "Value",
-) -> None:
+def validate_timeframe(value: str) -> bool:
     """
-    Validate that a numeric value is within a specified range.
-
+    Validate a timeframe string (e.g., 1m, 5m, 1h, 4h, 1d, 1w, 1M).
+    
     Args:
-        value: The value to validate.
-        min_value: The minimum allowed value (inclusive).
-        max_value: The maximum allowed value (inclusive).
-        name: The name of the value for error messages.
-
-    Raises:
-        ValidationError: If the value is not within the specified range.
+        value: The timeframe string to validate
+        
+    Returns:
+        True if valid, False otherwise
     """
-    if min_value is not None and value < min_value:
-        raise ValidationError(f"{name} must be at least {min_value}")
-
-    if max_value is not None and value > max_value:
-        raise ValidationError(f"{name} must be at most {max_value}")
+    return bool(TIMEFRAME_PATTERN.match(value))
 
 
-def validate_enum(value: Any, allowed_values: Set[Any], name: str = "Value") -> None:
+def validate_symbol(value: str) -> bool:
     """
-    Validate that a value is one of the allowed values.
-
+    Validate a trading symbol (e.g., BTC/USDT).
+    
     Args:
-        value: The value to validate.
-        allowed_values: The set of allowed values.
-        name: The name of the value for error messages.
-
-    Raises:
-        ValidationError: If the value is not one of the allowed values.
+        value: The symbol to validate
+        
+    Returns:
+        True if valid, False otherwise
     """
-    if value not in allowed_values:
-        allowed_str = ", ".join(str(v) for v in allowed_values)
-        raise ValidationError(f"{name} must be one of: {allowed_str}")
+    return bool(SYMBOL_PATTERN.match(value))
 
 
-def validate_config_schema(config: Dict[str, Any], schema: Dict[str, Dict[str, Any]]) -> None:
+def validate_port(value: int) -> bool:
     """
-    Validate a configuration dictionary against a schema.
-
+    Validate a network port number.
+    
     Args:
-        config: The configuration dictionary to validate.
-        schema: The schema to validate against.
-
-    Raises:
-        ValidationError: If the configuration doesn't match the schema.
+        value: The port number to validate
+        
+    Returns:
+        True if valid, False otherwise
     """
-    for key, value in config.items():
-        if key not in schema:
-            logger.warning(f"Unknown configuration key: {key}")
-            continue
+    return 1 <= value <= 65535
 
-        key_schema = schema[key]
-        key_type = key_schema.get("type")
 
-        # Check type
-        if key_type and not isinstance(value, key_type):
-            raise ValidationError(
-                f"Invalid type for {key}: expected {key_type.__name__}, got {type(value).__name__}"
-            )
+def validate_percentage(value: float) -> bool:
+    """
+    Validate a percentage value (0-100).
+    
+    Args:
+        value: The percentage value to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return 0 <= value <= 100
 
-        # Check enum
-        if "enum" in key_schema and value not in key_schema["enum"]:
-            allowed_str = ", ".join(str(v) for v in key_schema["enum"])
-            raise ValidationError(f"{key} must be one of: {allowed_str}")
 
-        # Check range
-        if "min" in key_schema and value < key_schema["min"]:
-            raise ValidationError(f"{key} must be at least {key_schema['min']}")
+def validate_positive(value: Union[int, float]) -> bool:
+    """
+    Validate that a value is positive.
+    
+    Args:
+        value: The value to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return value > 0
 
-        if "max" in key_schema and value > key_schema["max"]:
-            raise ValidationError(f"{key} must be at most {key_schema['max']}")
 
-        # Check pattern
-        if "pattern" in key_schema and not key_schema["pattern"].match(str(value)):
-            raise ValidationError(f"{key} does not match the required pattern")
+def validate_non_negative(value: Union[int, float]) -> bool:
+    """
+    Validate that a value is non-negative.
+    
+    Args:
+        value: The value to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return value >= 0
 
-        # Check custom validation
-        if "validate" in key_schema:
-            try:
-                key_schema["validate"](value)
-            except ValidationError as e:
-                raise ValidationError(f"Invalid value for {key}: {str(e)}")
-            except Exception as e:
-                raise ValidationError(f"Validation error for {key}: {str(e)}")
 
-    # Check required keys
-    required_keys = [k for k, v in schema.items() if v.get("required", False)]
-    validate_required_config(config, required_keys)
+def validate_config(config: Dict[str, Any]) -> List[str]:
+    """
+    Validate the entire configuration.
+    
+    Args:
+        config: Dictionary of configuration values
+        
+    Returns:
+        List of validation error messages, empty if all valid
+    """
+    errors = []
+    
+    # Validate email addresses
+    for key in ["NOTIFICATION_EMAIL_FROM", "NOTIFICATION_EMAIL_TO"]:
+        if config.get(key) and not validate_email(config[key]):
+            errors.append(f"Invalid email address for {key}: {config[key]}")
+    
+    # Validate URLs
+    for key in ["COINGLASS_API_BASE_URL"]:
+        if config.get(key) and not validate_url(config[key]):
+            errors.append(f"Invalid URL for {key}: {config[key]}")
+    
+    # Validate dates
+    for key in ["HISTORICAL_DATA_START_DATE", "HISTORICAL_DATA_END_DATE"]:
+        if config.get(key) and not validate_date(config[key]):
+            errors.append(f"Invalid date format for {key}: {config[key]}")
+    
+    # Validate timeframe
+    if not validate_timeframe(config.get("DEFAULT_TIMEFRAME", "")):
+        errors.append(f"Invalid timeframe format for DEFAULT_TIMEFRAME: {config.get('DEFAULT_TIMEFRAME')}")
+    
+    # Validate symbol
+    if not validate_symbol(config.get("DEFAULT_SYMBOL", "")):
+        errors.append(f"Invalid symbol format for DEFAULT_SYMBOL: {config.get('DEFAULT_SYMBOL')}")
+    
+    # Validate port
+    if not validate_port(config.get("WEB_APP_PORT", 0)):
+        errors.append(f"Invalid port number for WEB_APP_PORT: {config.get('WEB_APP_PORT')}")
+    
+    if not validate_port(config.get("SMTP_PORT", 0)):
+        errors.append(f"Invalid port number for SMTP_PORT: {config.get('SMTP_PORT')}")
+    
+    # Validate percentages
+    for key in ["MEMORY_THRESHOLD_PERCENT", "RISK_PER_TRADE_PERCENT", 
+                "STOP_LOSS_PERCENT", "TAKE_PROFIT_PERCENT"]:
+        if not validate_percentage(config.get(key, 0)):
+            errors.append(f"Invalid percentage value for {key}: {config.get(key)}")
+    
+    # Validate positive values
+    for key in ["DEFAULT_WINDOW_SIZE", "DEFAULT_LOOKAHEAD_CANDLES", 
+                "INITIAL_BATCH_SIZE", "MIN_BATCH_SIZE", "MAX_BATCH_SIZE",
+                "GC_FREQUENCY", "MEMORY_CHECK_INTERVAL_SECONDS", 
+                "MAX_POSITION_SIZE_USD", "MAX_OPEN_POSITIONS"]:
+        if not validate_positive(config.get(key, 0)):
+            errors.append(f"Value must be positive for {key}: {config.get(key)}")
+    
+    # Validate non-negative values
+    for key in ["DEFAULT_MIN_ABS_SCORE", "VOLUME_SURGE_THRESHOLD", 
+                "LIQUIDATION_THRESHOLD_USD", "FUNDING_RATE_THRESHOLD",
+                "PRICE_DIVERGENCE_THRESHOLD", "CVD_DIVERGENCE_THRESHOLD",
+                "AGGRESSOR_VOLUME_THRESHOLD"]:
+        if not validate_non_negative(config.get(key, -1)):
+            errors.append(f"Value must be non-negative for {key}: {config.get(key)}")
+    
+    return errors

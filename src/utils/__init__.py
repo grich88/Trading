@@ -1,16 +1,96 @@
 """
-Utils Module
+Utilities package.
 
-This module contains utility functions and helpers for the Trading Algorithm System.
+This package provides utility functions and classes for the application.
 """
 
-from src.utils.logging_service import setup_logger
-from src.utils.error_handling import handle_errors, AppError
-from src.utils.performance import performance_timer
+from src.utils.logging_service import (
+    LoggingService,
+    get_logger,
+    default_logger,
+    log_function_call,
+    JsonFormatter,
+    configure_root_logger
+)
+
+from src.utils.error_handling import (
+    ApplicationError,
+    ConfigurationError,
+    DataError,
+    APIError,
+    ModelError,
+    ValidationError,
+    AuthenticationError,
+    AuthorizationError,
+    NetworkError,
+    ResourceError,
+    TimeoutError,
+    handle_exception,
+    exception_handler,
+    retry,
+    async_retry,
+    error_context,
+    async_error_context,
+    safe_execute,
+    safe_execute_async
+)
+
+from src.utils.performance import (
+    performance_monitor,
+    async_performance_monitor,
+    MemoryMonitor,
+    get_memory_monitor,
+    adaptive_batch_processing,
+    async_adaptive_batch_processing,
+    timer,
+    memory_usage,
+    profiler,
+    SystemProfiler,
+    run_with_profiling,
+    run_with_async_profiling
+)
 
 __all__ = [
-    "setup_logger",
-    "handle_errors",
-    "AppError",
-    "performance_timer",
+    # Logging
+    'LoggingService',
+    'get_logger',
+    'default_logger',
+    'log_function_call',
+    'JsonFormatter',
+    'configure_root_logger',
+    
+    # Error handling
+    'ApplicationError',
+    'ConfigurationError',
+    'DataError',
+    'APIError',
+    'ModelError',
+    'ValidationError',
+    'AuthenticationError',
+    'AuthorizationError',
+    'NetworkError',
+    'ResourceError',
+    'TimeoutError',
+    'handle_exception',
+    'exception_handler',
+    'retry',
+    'async_retry',
+    'error_context',
+    'async_error_context',
+    'safe_execute',
+    'safe_execute_async',
+    
+    # Performance
+    'performance_monitor',
+    'async_performance_monitor',
+    'MemoryMonitor',
+    'get_memory_monitor',
+    'adaptive_batch_processing',
+    'async_adaptive_batch_processing',
+    'timer',
+    'memory_usage',
+    'profiler',
+    'SystemProfiler',
+    'run_with_profiling',
+    'run_with_async_profiling'
 ]
