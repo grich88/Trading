@@ -3,158 +3,170 @@ Tests for the configuration module.
 """
 
 import os
-from unittest import mock
+import unittest
+from unittest.mock import patch, MagicMock
 
-import pytest
-
-from src.config import Config
-from src.utils.error_handling import ValidationError
-from src.config.validators import (
-    validate_required_config,
-    validate_directory,
-    validate_api_credentials,
-    validate_numeric_range,
-    validate_enum,
-)
+from src.config.config import Config, validate_all_config
+from src.config.defaults import get_default
+from src.config.validators import validate_email, validate_url, validate_date, validate_timeframe
 
 
-def test_config_get():
-    """Test getting configuration values."""
-    # Test getting a value from environment
-    with mock.patch.dict(os.environ, {"TEST_KEY": "test_value"}):
-        assert Config.get("TEST_KEY") == "test_value"
+class TestConfig(unittest.TestCase):
+    """Test cases for the Config class."""
     
-    # Test getting a default value
-    assert Config.get("NON_EXISTENT_KEY", "default") == "default"
+    def setUp(self):
+        """Set up test environment."""
+        # Clear environment variables before each test
+        for key in list(os.environ.keys()):
+            if key.startswith("TEST_"):
+                del os.environ[key]
     
-    # Test getting a value from defaults
-    assert Config.get("APP_MODE") == "development"
+    def test_get_str(self):
+        """Test get_str method."""
+        # Test with environment variable set
+        os.environ["TEST_STR"] = "test_value"
+        self.assertEqual(Config.get_str("TEST_STR"), "test_value")
+        
+        # Test with default value
+        self.assertEqual(Config.get_str("TEST_MISSING", "default"), "default")
+        
+        # Test with no default value
+        self.assertEqual(Config.get_str("TEST_MISSING"), "")
+    
+    def test_get_int(self):
+        """Test get_int method."""
+        # Test with environment variable set
+        os.environ["TEST_INT"] = "42"
+        self.assertEqual(Config.get_int("TEST_INT"), 42)
+        
+        # Test with default value
+        self.assertEqual(Config.get_int("TEST_MISSING", 24), 24)
+        
+        # Test with no default value
+        self.assertEqual(Config.get_int("TEST_MISSING"), 0)
+        
+        # Test with invalid value
+        os.environ["TEST_INVALID_INT"] = "not_an_int"
+        self.assertEqual(Config.get_int("TEST_INVALID_INT", 99), 99)
+    
+    def test_get_float(self):
+        """Test get_float method."""
+        # Test with environment variable set
+        os.environ["TEST_FLOAT"] = "3.14"
+        self.assertEqual(Config.get_float("TEST_FLOAT"), 3.14)
+        
+        # Test with default value
+        self.assertEqual(Config.get_float("TEST_MISSING", 2.71), 2.71)
+        
+        # Test with no default value
+        self.assertEqual(Config.get_float("TEST_MISSING"), 0.0)
+        
+        # Test with invalid value
+        os.environ["TEST_INVALID_FLOAT"] = "not_a_float"
+        self.assertEqual(Config.get_float("TEST_INVALID_FLOAT", 9.9), 9.9)
+    
+    def test_get_bool(self):
+        """Test get_bool method."""
+        # Test with environment variable set to true values
+        for true_value in ["true", "True", "TRUE", "yes", "Yes", "YES", "1", "t", "y"]:
+            os.environ["TEST_BOOL"] = true_value
+            self.assertTrue(Config.get_bool("TEST_BOOL"))
+        
+        # Test with environment variable set to false values
+        for false_value in ["false", "False", "FALSE", "no", "No", "NO", "0", "f", "n"]:
+            os.environ["TEST_BOOL"] = false_value
+            self.assertFalse(Config.get_bool("TEST_BOOL"))
+        
+        # Test with default value
+        self.assertTrue(Config.get_bool("TEST_MISSING", True))
+        self.assertFalse(Config.get_bool("TEST_MISSING", False))
+        
+        # Test with no default value
+        self.assertFalse(Config.get_bool("TEST_MISSING"))
+    
+    def test_get_list(self):
+        """Test get_list method."""
+        # Test with environment variable set
+        os.environ["TEST_LIST"] = "item1,item2,item3"
+        self.assertEqual(Config.get_list("TEST_LIST"), ["item1", "item2", "item3"])
+        
+        # Test with custom separator
+        os.environ["TEST_LIST_SEMICOLON"] = "item1;item2;item3"
+        self.assertEqual(Config.get_list("TEST_LIST_SEMICOLON", separator=";"), ["item1", "item2", "item3"])
+        
+        # Test with default value
+        self.assertEqual(Config.get_list("TEST_MISSING", ["default"]), ["default"])
+        
+        # Test with no default value
+        self.assertEqual(Config.get_list("TEST_MISSING"), [])
+        
+        # Test with empty string
+        os.environ["TEST_LIST_EMPTY"] = ""
+        self.assertEqual(Config.get_list("TEST_LIST_EMPTY"), [""])
 
 
-def test_config_set():
-    """Test setting configuration values."""
-    # Set a value
-    Config.set("TEST_KEY", "test_value")
+class TestValidators(unittest.TestCase):
+    """Test cases for the validator functions."""
     
-    # Check that the value was set
-    assert Config.get("TEST_KEY") == "test_value"
+    def test_validate_email(self):
+        """Test email validation."""
+        self.assertTrue(validate_email("user@example.com"))
+        self.assertTrue(validate_email("user.name+tag@example.co.uk"))
+        self.assertFalse(validate_email("not_an_email"))
+        self.assertFalse(validate_email("missing@domain"))
+        self.assertFalse(validate_email("@example.com"))
+        # Empty string should be valid (optional email)
+        self.assertTrue(validate_email(""))
     
-    # Override the value
-    Config.set("TEST_KEY", "new_value")
+    def test_validate_url(self):
+        """Test URL validation."""
+        self.assertTrue(validate_url("http://example.com"))
+        self.assertTrue(validate_url("https://api.example.com/v1"))
+        self.assertFalse(validate_url("not_a_url"))
+        self.assertFalse(validate_url("ftp://example.com"))
+        # Empty string should be valid (optional URL)
+        self.assertTrue(validate_url(""))
     
-    # Check that the value was updated
-    assert Config.get("TEST_KEY") == "new_value"
+    def test_validate_date(self):
+        """Test date validation."""
+        self.assertTrue(validate_date("2023-01-01"))
+        self.assertTrue(validate_date("2023-12-31"))
+        self.assertFalse(validate_date("2023/01/01"))
+        self.assertFalse(validate_date("01-01-2023"))
+        self.assertFalse(validate_date("2023-13-01"))  # Invalid month
+        self.assertFalse(validate_date("2023-01-32"))  # Invalid day
+        # Empty string should be valid (optional date)
+        self.assertTrue(validate_date(""))
+    
+    def test_validate_timeframe(self):
+        """Test timeframe validation."""
+        self.assertTrue(validate_timeframe("1m"))
+        self.assertTrue(validate_timeframe("5m"))
+        self.assertTrue(validate_timeframe("1h"))
+        self.assertTrue(validate_timeframe("4h"))
+        self.assertTrue(validate_timeframe("1d"))
+        self.assertTrue(validate_timeframe("1w"))
+        self.assertTrue(validate_timeframe("1M"))
+        self.assertFalse(validate_timeframe("m"))
+        self.assertFalse(validate_timeframe("5"))
+        self.assertFalse(validate_timeframe("5x"))
+        self.assertFalse(validate_timeframe("0m"))
 
 
-def test_config_environment_modes():
-    """Test environment mode checks."""
-    # Test development mode
-    Config.set("APP_MODE", "development")
-    assert Config.is_development() is True
-    assert Config.is_production() is False
-    assert Config.is_testing() is False
+class TestConfigIntegration(unittest.TestCase):
+    """Integration tests for the configuration module."""
     
-    # Test production mode
-    Config.set("APP_MODE", "production")
-    assert Config.is_development() is False
-    assert Config.is_production() is True
-    assert Config.is_testing() is False
-    
-    # Test testing mode
-    Config.set("APP_MODE", "testing")
-    assert Config.is_development() is False
-    assert Config.is_production() is False
-    assert Config.is_testing() is True
+    @patch('src.config.config.validate_config')
+    def test_validate_all_config(self, mock_validate_config):
+        """Test validate_all_config function."""
+        # Test with valid configuration
+        mock_validate_config.return_value = []
+        self.assertTrue(validate_all_config())
+        
+        # Test with invalid configuration
+        mock_validate_config.return_value = ["Error 1", "Error 2"]
+        self.assertFalse(validate_all_config())
 
 
-def test_validate_required_config():
-    """Test validation of required configuration keys."""
-    # Test valid configuration
-    config = {"key1": "value1", "key2": "value2"}
-    validate_required_config(config, ["key1", "key2"])
-    
-    # Test missing key
-    with pytest.raises(ValidationError):
-        validate_required_config(config, ["key1", "key3"])
-    
-    # Test empty value
-    config["key2"] = ""
-    with pytest.raises(ValidationError):
-        validate_required_config(config, ["key1", "key2"])
-    
-    # Test boolean value (should not be considered empty)
-    config["key2"] = False
-    validate_required_config(config, ["key1", "key2"])
-
-
-def test_validate_directory(temp_dir):
-    """Test validation of directories."""
-    # Test existing directory
-    validate_directory(temp_dir)
-    
-    # Test non-existent directory
-    non_existent_dir = os.path.join(temp_dir, "non_existent")
-    with pytest.raises(ValidationError):
-        validate_directory(non_existent_dir)
-    
-    # Test creating non-existent directory
-    validate_directory(non_existent_dir, create=True)
-    assert os.path.exists(non_existent_dir)
-    
-    # Test file as directory
-    test_file = os.path.join(temp_dir, "test_file")
-    with open(test_file, "w") as f:
-        f.write("test")
-    
-    with pytest.raises(ValidationError):
-        validate_directory(test_file)
-
-
-def test_validate_api_credentials():
-    """Test validation of API credentials."""
-    # Test valid credentials
-    validate_api_credentials("api_key", "api_secret")
-    
-    # Test missing API key
-    with pytest.raises(ValidationError):
-        validate_api_credentials("", "api_secret")
-    
-    # Test missing API secret
-    with pytest.raises(ValidationError):
-        validate_api_credentials("api_key", "")
-
-
-def test_validate_numeric_range():
-    """Test validation of numeric ranges."""
-    # Test valid value
-    validate_numeric_range(5, 0, 10)
-    
-    # Test value below minimum
-    with pytest.raises(ValidationError):
-        validate_numeric_range(5, 6, 10)
-    
-    # Test value above maximum
-    with pytest.raises(ValidationError):
-        validate_numeric_range(5, 0, 4)
-    
-    # Test without minimum
-    validate_numeric_range(5, None, 10)
-    
-    # Test without maximum
-    validate_numeric_range(5, 0, None)
-
-
-def test_validate_enum():
-    """Test validation of enum values."""
-    # Test valid value
-    validate_enum("a", {"a", "b", "c"})
-    
-    # Test invalid value
-    with pytest.raises(ValidationError):
-        validate_enum("d", {"a", "b", "c"})
-    
-    # Test with custom name
-    with pytest.raises(ValidationError) as excinfo:
-        validate_enum("d", {"a", "b", "c"}, name="Letter")
-    
-    assert "Letter" in str(excinfo.value)
+if __name__ == "__main__":
+    unittest.main()
