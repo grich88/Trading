@@ -1,13 +1,15 @@
 """
-Models Module
+Models package.
 
-This module contains trading models and algorithms for the Trading Algorithm System.
+This package provides model classes for the application.
 """
 
 from src.models.base_model import BaseModel
-# from src.models.rsi_volume_model import RsiVolumeModel
+from src.models.rsi_volume_analyzer import RSIVolumeAnalyzer, calculate_rsi, analyze_rsi_volume
 
 __all__ = [
-    "BaseModel",
-    # "RsiVolumeModel",
+    'BaseModel',
+    'RSIVolumeAnalyzer',
+    'calculate_rsi',
+    'analyze_rsi_volume'
 ]
